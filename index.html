@@ -199,13 +199,29 @@
       const signal = data.signal;
       const features = signal?.features || {};
       const decision = data.latest_decision;
+      
+      const decisionAgeMs = decision
+        ? Date.now() - new Date(decision.evaluated_at).getTime()
+        : NaN;
 
-      const active = data.signal_fresh && signal && decision &&
+      const active = Boolean(
+        data.signal_fresh &&
+        signal &&
+        decision &&
         decision.signal_id === signal.id &&
-        (Date.now() - new Date(decision.evaluated_at).getTime()) <= 90000;
+        decision.market_id === signal.market_id &&
+        Number.isFinite(decisionAgeMs) &&
+        decisionAgeMs >= 0 &&
+        decisionAgeMs <= 90000
+      );
 
-      const action = active ? decision.decision : "WAIT";
-      $("decision").textContent = action || "WAIT";
+      const action = active ? decision.decision : "WAIT";    
+$("decision").textContent =
+  action === "BUY_UP"
+    ? "BUY UP"
+    : action === "BUY_DOWN"
+    ? "BUY DOWN"
+    : action || "WAIT";
       $("decision").className = "decision " +
         (action === "BUY_UP" ? "green" : action === "BUY_DOWN" ? "red" : "yellow");
 
