@@ -1,0 +1,288 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <title>BTC AI Dashboard</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #0b1020;
+      color: #f5f7ff;
+      font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    }
+    main { max-width: 800px; margin: auto; padding: 20px; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    h1 { font-size: 25px; margin-bottom: 4px; }
+    h2 { font-size: 17px; margin: 0 0 14px; }
+    p { color: #aab4cc; }
+    .card {
+      background: #171e32;
+      border: 1px solid #29334e;
+      border-radius: 18px;
+      padding: 20px;
+      margin-top: 16px;
+    }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .stat { background: #202a43; border-radius: 12px; padding: 15px; }
+    .label { color: #aab4cc; font-size: 12px; }
+    .value { font-size: 24px; font-weight: 750; margin-top: 6px; }
+    .decision { font-size: 43px; font-weight: 800; margin: 12px 0; }
+    .green { color: #45e6a2; }
+    .red { color: #ff7185; }
+    .yellow { color: #ffd36c; }
+    .muted { color: #aab4cc; }
+    input, button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 10px;
+      border-radius: 10px;
+      font-size: 16px;
+    }
+    input { background: #10172a; color: white; border: 1px solid #35405e; }
+    button { background: #587bff; color: white; border: none; font-weight: bold; cursor: pointer; }
+    button:disabled { opacity: .6; }
+    .small-button { width: auto; padding: 9px 13px; font-size: 13px; }
+    .trade { border-top: 1px solid #35405e; padding: 12px 0; font-size: 14px; }
+    .hidden { display: none; }
+    .notice { font-size: 12px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>₿ BTC AI</h1>
+      <span class="muted">Polymarket · 5-Minute Signals</span>
+    </div>
+    <button id="logout" class="small-button hidden">Log out</button>
+  </header>
+
+  <section id="login" class="card">
+    <h2>Secure Dashboard Login</h2>
+    <form id="loginForm">
+      <input id="email" type="email" placeholder="Email" autocomplete="username" required>
+      <input id="password" type="password" placeholder="Password" autocomplete="current-password" required>
+      <button type="submit">Sign In</button>
+    </form>
+    <p id="loginError" role="alert"></p>
+  </section>
+
+  <section id="dashboard" class="hidden">
+    <div class="card">
+      <div class="label">LATEST PAPER DECISION</div>
+      <div id="decision" class="decision yellow">LOADING</div>
+      <p id="reason">Connecting to your AI...</p>
+      <p id="freshness" class="notice"></p>
+    </div>
+
+    <div class="card">
+      <h2>AI Probability Estimates</h2>
+      <div class="grid">
+        <div class="stat"><div class="label">UP probability</div><div id="upProb" class="value">—</div></div>
+        <div class="stat"><div class="label">DOWN probability</div><div id="downProb" class="value">—</div></div>
+        <div class="stat"><div class="label">UP ask</div><div id="upAsk" class="value">—</div></div>
+        <div class="stat"><div class="label">DOWN ask</div><div id="downAsk" class="value">—</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Paper Trading Performance</h2>
+      <div class="grid">
+        <div class="stat"><div class="label">Simulated P&L</div><div id="pnl" class="value">—</div></div>
+        <div class="stat"><div class="label">Win rate</div><div id="winRate" class="value">—</div></div>
+        <div class="stat"><div class="label">Closed trades (sample)</div><div id="closed" class="value">—</div></div>
+        <div class="stat"><div class="label">Open positions</div><div id="open" class="value">—</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Open Paper Positions</h2>
+      <div id="positions" class="muted">No open positions</div>
+    </div>
+
+    <div class="card">
+      <h2>Recent Paper Trades</h2>
+      <div id="trades"></div>
+    </div>
+
+    <div class="card">
+      <p id="status" class="notice">Waiting for first update...</p>
+      <p class="notice">Experimental signals only. Simulated trading, not financial advice. Estimates may be inaccurate. No real-money orders are placed.</p>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+  import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+  const SUPABASE_URL = "https://avcctxginquljrvihdpo.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_CzRTK9NjBsxqjWDVw1ioDA_cPJDaFYb";
+  const API_URL = SUPABASE_URL + "/functions/v1/btc-dashboard-api";
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const $ = id => document.getElementById(id);
+  let refreshTimer = null;
+  let loading = false;
+
+  function showLogin(message = "") {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+    $("login").classList.remove("hidden");
+    $("dashboard").classList.add("hidden");
+    $("logout").classList.add("hidden");
+    $("loginError").textContent = message;
+  }
+
+  function showDashboard() {
+    $("login").classList.add("hidden");
+    $("dashboard").classList.remove("hidden");
+    $("logout").classList.remove("hidden");
+    if (!refreshTimer) {
+      refreshTimer = setInterval(loadDashboard, 15000);
+    }
+    loadDashboard();
+  }
+
+  function money(value) {
+    const n = Number(value);
+    return (n >= 0 ? "+" : "-") + "$" + Math.abs(n).toFixed(2);
+  }
+
+  function renderTrade(container, trade) {
+    const item = document.createElement("div");
+    item.className = "trade";
+    const direction = document.createElement("strong");
+    direction.textContent = trade.direction || "UNKNOWN";
+    const info = document.createElement("div");
+    info.textContent =
+      "Entry: $" + Number(trade.entry_price).toFixed(2) +
+      " · " + (trade.status || "UNKNOWN") +
+      (trade.profit_loss == null ? "" : " · P&L: " + money(trade.profit_loss));
+    item.append(direction, info);
+    container.appendChild(item);
+  }
+
+  async function loadDashboard() {
+    if (loading) return;
+    loading = true;
+
+    try {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+
+      if (sessionError || !sessionData.session) {
+        showLogin("Please sign in.");
+        return;
+      }
+
+      const response = await fetch(API_URL, {
+        headers: {
+          "apikey": SUPABASE_KEY,
+          "Authorization": "Bearer " + sessionData.session.access_token
+        },
+        cache: "no-store"
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        await supabase.auth.signOut({ scope: "local" });
+        showLogin("Session expired or access denied. Please sign in again.");
+        return;
+      }
+
+      if (!response.ok) throw new Error("API returned HTTP " + response.status);
+
+      const data = await response.json();
+      const signal = data.signal;
+      const features = signal?.features || {};
+      const decision = data.latest_decision;
+
+      const active = data.signal_fresh && signal && decision &&
+        decision.signal_id === signal.id &&
+        (Date.now() - new Date(decision.evaluated_at).getTime()) <= 90000;
+
+      const action = active ? decision.decision : "WAIT";
+      $("decision").textContent = action || "WAIT";
+      $("decision").className = "decision " +
+        (action === "BUY_UP" ? "green" : action === "BUY_DOWN" ? "red" : "yellow");
+
+      $("reason").textContent = active
+        ? (decision.reason || "No reason provided")
+        : "No current verified paper decision. Do not act on stale data.";
+
+      $("freshness").textContent = data.signal_fresh
+        ? "Signal age at API response: " + Math.round(data.signal_age_seconds) + " seconds"
+        : "Signal unavailable or stale";
+
+      $("upProb").textContent = signal && features.ai_probability_up != null
+        ? (Number(features.ai_probability_up) * 100).toFixed(1) + "%" : "—";
+      $("downProb").textContent = signal && features.ai_probability_down != null
+        ? (Number(features.ai_probability_down) * 100).toFixed(1) + "%" : "—";
+      $("upAsk").textContent = features.up_ask == null ? "—" : "$" + Number(features.up_ask).toFixed(2);
+      $("downAsk").textContent = features.down_ask == null ? "—" : "$" + Number(features.down_ask).toFixed(2);
+
+      const perf = data.performance || {};
+      $("pnl").textContent = money(perf.realized_pnl_in_sample || 0);
+      $("winRate").textContent = perf.win_rate_in_sample == null
+        ? "—" : (perf.win_rate_in_sample * 100).toFixed(1) + "%";
+      $("closed").textContent = perf.closed_trades_in_sample ?? 0;
+      $("open").textContent = (data.open_trades || []).length;
+
+      $("positions").replaceChildren();
+      if (!data.open_trades?.length) {
+        $("positions").textContent = "No open paper positions";
+      } else {
+        data.open_trades.forEach(t => renderTrade($("positions"), t));
+      }
+
+      $("trades").replaceChildren();
+      (data.recent_trades || []).slice(0, 10).forEach(
+        t => renderTrade($("trades"), t)
+      );
+
+      $("status").textContent =
+        "Updated: " + new Date(data.generated_at).toLocaleTimeString() +
+        " · Paper trading only";
+    } catch (error) {
+      $("decision").textContent = "UNAVAILABLE";
+      $("decision").className = "decision yellow";
+      $("reason").textContent = "Connection error. No current recommendation.";
+      $("status").textContent = error.message;
+    } finally {
+      loading = false;
+    }
+  }
+
+  $("loginForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    $("loginError").textContent = "";
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: $("email").value.trim(),
+      password: $("password").value
+    });
+
+    $("password").value = "";
+
+    if (error) {
+      $("loginError").textContent = error.message;
+      return;
+    }
+
+    showDashboard();
+  });
+
+  $("logout").addEventListener("click", async () => {
+    await supabase.auth.signOut();
+    showLogin();
+  });
+
+  const { data } = await supabase.auth.getSession();
+  if (data.session) showDashboard();
+  else showLogin();
+</script>
+</body>
+</html>
