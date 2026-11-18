@@ -1,0 +1,12 @@
+
+{
+  "name": "BTC AI",
+  "short_name": "BTC AI",
+  "description": "Polymarket BTC 5-minute paper-trading signals dashboard",
+  "id": "/polymarket-btc-5m-signals/",
+  "start_url": "/polymarket-btc-5m-signals/",
+  "scope": "/polymarket-btc-5m-signals/",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220"
+}
