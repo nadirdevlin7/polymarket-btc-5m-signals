@@ -144,6 +144,10 @@
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
   const $ = id => document.getElementById(id);
   let refreshTimer = null;
+  // Track completed paper exits seen during this dashboard session.
+  // Do not alert on historical exits when the page first loads.
+  let knownExitIds = new Set();
+  let exitMonitorInitialized = false;
   let loading = false;
 
   function showLogin(message = "") {
@@ -320,7 +324,57 @@ $("decision").textContent =
       const exits = Array.isArray(data.exit_monitor)
         ? data.exit_monitor
         : null;
+      // Detect newly observed completed paper exits.
+      // The first successful load establishes the baseline.
+      let newExits = [];
 
+      if (exits !== null) {
+        const currentExitIds = new Set(
+          exits.map(exit => String(exit.trade_id))
+        );
+
+        if (exitMonitorInitialized) {
+          newExits = exits.filter(
+            exit => !knownExitIds.has(String(exit.trade_id))
+          );
+        }
+
+        currentExitIds.forEach(id => knownExitIds.add(id));
+        exitMonitorInitialized = true;
+      }
+
+      // Highlight newly detected completed paper exits.
+      if (newExits.length > 0) {
+        const alert = document.createElement("div");
+        alert.className = "trade";
+
+        alert.style.border = "2px solid #22c55e";
+        alert.style.padding = "12px";
+        alert.style.marginBottom = "12px";
+        alert.style.borderRadius = "8px";
+
+        const heading = document.createElement("div");
+        heading.style.fontWeight = "bold";
+        heading.style.color = "#22c55e";
+        heading.textContent =
+          "🔔 NEW PAPER EXIT DETECTED";
+
+        const details = document.createElement("div");
+        details.textContent =
+          newExits.length === 1
+            ? "1 simulated position has closed."
+            : newExits.length +
+              " simulated positions have closed.";
+
+        const note = document.createElement("div");
+        note.className = "muted";
+        note.textContent =
+          "Newly observed completed paper trade. " +
+          "Not a live SELL NOW instruction.";
+
+        alert.append(heading, details, note);
+        $("exits").appendChild(alert);
+      }
       if (exits === null) {
         $("exits").textContent =
           "Exit monitor unavailable. Check API connection.";
