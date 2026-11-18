@@ -111,7 +111,17 @@
   </div>
 </div>
 
-
+    
+<div class="card">
+  <h2>BTC AI SELL Exit Monitor</h2>
+  <p class="muted">
+    Completed simulated exits only.
+    These are historical paper trades, not live SELL NOW instructions.
+  </p>
+  <div id="exits" class="muted">
+    Checking completed paper exits...
+  </div>
+</div>
     <div class="card">
       <h2>Recent Paper Trades</h2>
       <div id="trades"></div>
@@ -304,6 +314,68 @@ $("decision").textContent =
       }
 
 
+      // Display completed simulated exits.
+      $("exits").replaceChildren();
+
+      const exits = Array.isArray(data.exit_monitor)
+        ? data.exit_monitor
+        : null;
+
+      if (exits === null) {
+        $("exits").textContent =
+          "Exit monitor unavailable. Check API connection.";
+      } else if (exits.length === 0) {
+        $("exits").textContent =
+          "No completed simulated exits";
+      } else {
+        exits.forEach(exit => {
+          const card = document.createElement("div");
+          card.className = "trade";
+
+          const direction = document.createElement("div");
+          direction.textContent =
+            (exit.direction === "UP" ? "UP" :
+             exit.direction === "DOWN" ? "DOWN" : "Unknown") +
+            " Position · SELL COMPLETED · PAPER";
+
+          const prices = document.createElement("div");
+          const entry = Number(exit.entry_price);
+          const exitPrice = Number(exit.exit_price);
+
+          const formatPrice = value =>
+            Number.isFinite(value) ? "$" + value.toFixed(2) : "—";
+
+          prices.textContent =
+            "Entry: " + formatPrice(entry) +
+            " · Exit: " + formatPrice(exitPrice);
+
+          const reason = document.createElement("div");
+          reason.textContent =
+            "Exit reason: " +
+            (exit.exit_reason || "Unavailable");
+
+          const pnl = document.createElement("div");
+          const profit = Number(exit.profit_loss);
+          pnl.textContent =
+            "Simulated P&L: " +
+            (exit.profit_loss == null || !Number.isFinite(profit)
+              ? "—"
+              : (profit >= 0 ? "+" : "") + "$" + profit.toFixed(2));
+
+          const time = document.createElement("div");
+          time.className = "muted";
+          const exitDate = new Date(exit.exit_time);
+          time.textContent =
+            "Closed: " +
+            (Number.isFinite(exitDate.getTime())
+              ? exitDate.toLocaleString()
+              : "Unknown");
+
+          card.append(direction, prices, reason, pnl, time);
+          $("exits").appendChild(card);
+        });
+      }
+      
       $("trades").replaceChildren();
       (data.recent_trades || []).slice(0, 10).forEach(
         t => renderTrade($("trades"), t)
