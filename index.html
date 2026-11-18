@@ -148,6 +148,10 @@
   // Do not alert on historical exits when the page first loads.
   let knownExitIds = new Set();
   let exitMonitorInitialized = false;
+  
+    // Keep newly detected paper exit alerts visible
+    // until the user acknowledges them.
+    let pendingExitAlerts = [];
   let loading = false;
 
   function showLogin(message = "") {
@@ -339,12 +343,25 @@ $("decision").textContent =
           );
         }
 
+        // Remember newly detected paper exits until acknowledged.
+        if (newExits.length > 0) {
+          const pendingIds = new Set(
+            pendingExitAlerts.map(exit => String(exit.trade_id))
+          );
+
+          newExits.forEach(exit => {
+            if (!pendingIds.has(String(exit.trade_id))) {
+              pendingExitAlerts.push(exit);
+            }
+          });
+        }
+        
         currentExitIds.forEach(id => knownExitIds.add(id));
         exitMonitorInitialized = true;
       }
 
       // Highlight newly detected completed paper exits.
-      if (newExits.length > 0) {
+      if (pendingExitAlerts.length > 0) {
         const alert = document.createElement("div");
         alert.className = "trade";
 
@@ -361,9 +378,9 @@ $("decision").textContent =
 
         const details = document.createElement("div");
         details.textContent =
-          newExits.length === 1
+          pendingExitAlerts.length === 1
             ? "1 simulated position has closed."
-            : newExits.length +
+            : pendingExitAlerts.length +
               " simulated positions have closed.";
 
         const note = document.createElement("div");
@@ -372,7 +389,21 @@ $("decision").textContent =
           "Newly observed completed paper trade. " +
           "Not a live SELL NOW instruction.";
 
-        alert.append(heading, details, note);
+        // Let the user acknowledge completed paper exit alerts.
+        const dismissButton = document.createElement("button");
+
+        dismissButton.textContent = "Dismiss Alert";
+        dismissButton.type = "button";
+        dismissButton.style.marginTop = "10px";
+        dismissButton.style.padding = "8px 14px";
+        dismissButton.style.cursor = "pointer";
+
+        dismissButton.addEventListener("click", () => {
+          pendingExitAlerts = [];
+          alert.remove();
+        });
+
+        alert.append(heading, details, note, dismissButton);
         $("exits").appendChild(alert);
       }
       if (exits === null) {
