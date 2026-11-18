@@ -131,9 +131,28 @@
       <div id="trades"></div>
     </div>
 
+
     <div class="card">
       <p id="status" class="notice">Waiting for first update...</p>
       <p class="notice">Experimental signals only. Simulated trading, not financial advice. Estimates may be inaccurate. No real-money orders are placed.</p>
+    </div>
+
+    <!-- BTC AI Push Notification Controls -->
+    <div class="card" id="notificationControls">
+      <h2>BTC AI Notifications</h2>
+
+      <p class="muted">
+        Receive alerts about simulated paper-trading events.
+        Notifications do not execute real-money trades.
+      </p>
+
+      <button id="enableNotifications" type="button">
+        🔔 Enable Notifications
+      </button>
+
+      <p id="notificationStatus" class="muted" role="status">
+        Notifications are not enabled yet.
+      </p>
     </div>
   </section>
 </main>
@@ -511,6 +530,45 @@ $("decision").textContent =
   if (data.session) showDashboard();
   else showLogin();
 </script>
+
+<script>
+  // Request permission for BTC AI paper-trading notifications.
+  const notificationButton =
+    document.getElementById("enableNotifications");
+
+  const notificationStatus =
+    document.getElementById("notificationStatus");
+
+  if (notificationButton && notificationStatus) {
+    notificationButton.addEventListener("click", async () => {
+      if (!("Notification" in window)) {
+        notificationStatus.textContent =
+          "Notifications are not supported in this browser.";
+        return;
+      }
+
+      try {
+        const permission = await Notification.requestPermission();
+
+        if (permission === "granted") {
+          notificationStatus.textContent =
+            "Notification permission granted. Push setup is still required.";
+        } else if (permission === "denied") {
+          notificationStatus.textContent =
+            "Notifications were denied. Check your iPhone settings.";
+        } else {
+          notificationStatus.textContent =
+            "Notification permission was not granted.";
+        }
+      } catch (error) {
+        console.error("Notification permission error:", error);
+        notificationStatus.textContent =
+          "Unable to request notification permission.";
+      }
+    });
+  }
+</script>
+
 <script>
   // Register BTC AI's service worker.
   if ("serviceWorker" in navigator) {
