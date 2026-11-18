@@ -99,10 +99,18 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2>Open Paper Positions</h2>
-      <div id="positions" class="muted">No open positions</div>
-    </div>
+    
+<div class="card">
+  <h2>BTC AI Position Monitor</h2>
+  <p class="muted">
+    Simulated positions only. HOLD means the position
+    is recorded as open, not that holding is recommended.
+  </p>
+  <div id="positions" class="muted">
+    Checking simulated positions...
+  </div>
+</div>
+
 
     <div class="card">
       <h2>Recent Paper Trades</h2>
@@ -247,12 +255,54 @@ $("decision").textContent =
       $("closed").textContent = perf.closed_trades_in_sample ?? 0;
       $("open").textContent = (data.open_trades || []).length;
 
+      
       $("positions").replaceChildren();
-      if (!data.open_trades?.length) {
-        $("positions").textContent = "No open paper positions";
+
+      const monitoredPositions = Array.isArray(data.position_monitor)
+        ? data.position_monitor
+        : [];
+
+      if (!Array.isArray(data.position_monitor)) {
+        $("positions").textContent =
+          "Position monitor unavailable. Check API connection.";
+      } else if (monitoredPositions.length === 0) {
+        $("positions").textContent =
+          "No open simulated positions";
       } else {
-        data.open_trades.forEach(t => renderTrade($("positions"), t));
+        monitoredPositions.forEach(position => {
+          const card = document.createElement("div");
+          card.className = "trade";
+
+          const direction = document.createElement("div");
+          direction.textContent =
+            position.direction === "UP"
+              ? "UP Position · PAPER"
+              : position.direction === "DOWN"
+              ? "DOWN Position · PAPER"
+              : "Unknown direction · PAPER";
+
+          const entry = document.createElement("div");
+          const entryPrice = Number(position.entry_price);
+          entry.textContent =
+            "Entry price: " +
+            (Number.isFinite(entryPrice) &&
+             position.entry_price != null
+              ? "$" + entryPrice.toFixed(2)
+              : "Unavailable");
+
+          const status = document.createElement("div");
+          status.textContent = "Status: OPEN · HOLD (recorded open)";
+
+          const note = document.createElement("div");
+          note.className = "muted";
+          note.textContent =
+            "Not a live HOLD recommendation. Exit checks run on the scheduled paper engine.";
+
+          card.append(direction, entry, status, note);
+          $("positions").appendChild(card);
+        });
       }
+
 
       $("trades").replaceChildren();
       (data.recent_trades || []).slice(0, 10).forEach(
