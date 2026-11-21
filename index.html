@@ -165,6 +165,7 @@
   const API_URL = SUPABASE_URL + "/functions/v1/btc-dashboard-api";
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  window.btcSupabase = supabase;
   const $ = id => document.getElementById(id);
   let refreshTimer = null;
   // Track completed paper exits seen during this dashboard session.
